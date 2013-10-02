@@ -52,7 +52,7 @@ class Poltergeist.Node
   dragBy: (xDelta, yDelta) ->
     this.scrollIntoView()
 
-    position = this.clickPosition()
+    position = this.mouseEventPosition()
     newPosition = {
       x: position.x + xDelta,
       y: position.y + yDelta,
