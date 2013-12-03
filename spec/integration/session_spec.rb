@@ -414,6 +414,23 @@ describe Capybara::Session do
     end
 
     context 'frame support' do
+      it 'supports selection by index' do
+        @session.visit '/poltergeist/frames'
+
+        @session.within_frame 0 do
+          expect(@session.current_path).to eq("/poltergeist/slow")
+        end
+      end
+
+      it 'supports selection by element' do
+        @session.visit '/poltergeist/frames'
+        frame = @session.find(:css, 'iframe')
+
+        @session.within_frame(frame) do
+          expect(@session.current_path).to eq("/poltergeist/slow")
+        end
+      end
+
       it 'waits for the frame to load' do
         @session.visit '/'
 
@@ -477,7 +494,7 @@ describe Capybara::Session do
 
       it 'supports clicking in a frame nested in a frame' do
         @session.visit '/'
-        
+
         # The padding on the frame here is to differ the sizes of the two
         # frames, ensuring that their offsets are being calculated seperately.
         # This avoids a false positive where the same frame's offset is
@@ -525,6 +542,11 @@ describe Capybara::Session do
     it "throws an error on an invalid selector" do
       @session.visit "/poltergeist/table"
       expect { @session.find(:css, "table tr:last") }.to raise_error(Capybara::Poltergeist::InvalidSelector)
+    end
+
+    it 'throws an error on wrong xpath' do
+      @session.visit('/poltergeist/with_js')
+      expect { @session.find(:xpath, '#remove_me') }.to raise_error(Capybara::Poltergeist::InvalidSelector)
     end
 
     context 'whitespace stripping tests' do

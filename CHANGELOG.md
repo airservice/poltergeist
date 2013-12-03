@@ -1,10 +1,19 @@
 ### Next release ###
 
 #### Features ####
+*   Added ability to clear network traffic (Vick Vu)
 *   Added ability to set paper_size via a driver setter (Philippe Lehoux)
+*   Can support Basic HTTP authentication
+*   Added basic implementation of `send_keys`
 
 #### Bug fixes ####
-*   Use `Capybara::Helpers.normalize_whitespace` in filter_text to strip unicode whitespace (Wataru Miyaguni)
+*   Use `Capybara::Helpers.normalize_whitespace` in filter_text to strip unicode
+    whitespace (Wataru Miyaguni)
+*   Fix missed interpolation on deprecated error classes
+*   Raise InvalidSelector when wrong xpath selector was used [Issue #395]
+*   Fix `driver.quit` before visiting any url with `IOError` error [Issue #398]
+*   Fix JRuby support when PhantomJS quits first  [Issue #382, #404]
+*   Fix ability to pass element to `within_frame`  [Issue #414]
 
 ### 1.4.1 ###
 

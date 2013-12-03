@@ -43,26 +43,25 @@ dependencies* (you don't need Qt, or a running X server, etc.)
 
 * *Homebrew*: `brew install phantomjs`
 * *MacPorts*: `sudo port install phantomjs`
-* *Manual install*: [Download this](http://code.google.com/p/phantomjs/downloads/detail?name=phantomjs-1.8.1-macosx.zip&can=2&q=)
+* *Manual install*: [Download this](http://phantomjs.googlecode.com/files/phantomjs-1.9.2-macosx.zip)
 
 ### Linux ###
 
-* Download the [32
-bit](https://phantomjs.googlecode.com/files/phantomjs-1.9.2-linux-i686.tar.bz2)
-or [64
-bit](https://phantomjs.googlecode.com/files/phantomjs-1.9.2-linux-x86_64.tar.bz2)
+* Download the [32 bit](https://phantomjs.googlecode.com/files/phantomjs-1.9.2-linux-i686.tar.bz2)
+or [64 bit](https://phantomjs.googlecode.com/files/phantomjs-1.9.2-linux-x86_64.tar.bz2)
 binary.
 * Extract the tarball and copy `bin/phantomjs` into your `PATH`
 
 ### Windows ###
-* Download the [precompiled binary](http://phantomjs.org/download.html) for Windows
+* Download the [precompiled binary](http://phantomjs.googlecode.com/files/phantomjs-1.9.2-windows.zip)
+for Windows
 
 ### Manual compilation ###
 
 Do this as a last resort if the binaries don't work for you. It will
 take quite a long time as it has to build WebKit.
 
-* Download [the source tarball](http://code.google.com/p/phantomjs/downloads/detail?name=phantomjs-1.8.1-source.zip&can=2&q=)
+* Download [the source tarball](http://phantomjs.googlecode.com/files/phantomjs-1.9.2-source.zip)
 * Extract and cd in
 * `./build.sh`
 
@@ -102,8 +101,10 @@ and the following optional features:
 * `page.status_code`
 * `page.response_headers`
 * `page.save_screenshot`
-* `page.render_base64`
-* `page.scroll_to`
+* `page.driver.render_base64(format, options)`
+* `page.driver.scroll_to(left, top)`
+* `page.driver.basic_authorize(user, password)`
+* `element.native.send_keys(*keys)`
 * cookie handling
 * drag-and-drop
 
@@ -114,9 +115,12 @@ There are some additional features:
 You can grab screenshots of the page at any point by calling
 `save_screenshot('/path/to/file.png')` (this works the same way as the PhantomJS
 render feature, so you can specify other extensions like `.pdf`, `.gif`, etc.)
+Just in case you render pdf it's might be worth to set `driver.paper_size=` with
+settings provided by PhantomJS in [here](https://github.com/ariya/phantomjs/wiki/API-Reference-WebPage#wiki-webpage-paperSize)
 
-By default, only the viewport will be rendered (the part of the page that is in view). To render
-the entire page, use `save_screenshot('/path/to/file.png', :full => true)`.
+By default, only the viewport will be rendered (the part of the page that is in
+view). To render the entire page, use `save_screenshot('/path/to/file.png',
+:full => true)`.
 
 You also have an ability to render selected element. Pass option `selector` with
 any valid element selector to make a screenshot bounded by that element
@@ -195,6 +199,9 @@ You can inspect the network traffic (i.e. what resources have been
 loaded) on the current page by calling `page.driver.network_traffic`.
 This returns an array of request objects. A request object has a
 `response_parts` method containing data about the response chunks.
+Please note that network traffic is not cleared when you visit new page.
+You can manually clear the network traffic by calling `page.driver.clear_network_traffic`
+or `page.driver.reset`
 
 ### Manipulating cookies ###
 
@@ -235,6 +242,25 @@ page.within_window fb_popup do
 end
 ```
 
+### Sending keys ###
+
+There's an ability to send arbitrary keys to the element:
+
+``` ruby
+element = find('input#id')
+element.native.send_key('String')
+```
+
+or even more complicated:
+
+``` ruby
+element.native.send_keys('H', 'elo', :Left, 'l') # => 'Hello'
+element.native.send_key(:Enter) # triggers Enter key
+```
+Since it's implemented natively in PhantomJS this will exactly imitate user
+behavior.
+See more about [sendEvent](http://phantomjs.org/api/webpage/method/send-event.html) and
+[PhantomJS keys](https://github.com/ariya/phantomjs/commit/cab2635e66d74b7e665c44400b8b20a8f225153a)
 
 ## Customization ##
 

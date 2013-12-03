@@ -47,8 +47,11 @@ module Capybara::Poltergeist
     def start
       @read_io, @write_io = IO.pipe
       @out_thread = Thread.new {
-        while !@read_io.eof? && data = @read_io.readpartial(1024)
-          @phantomjs_logger.write(data)
+        loop do
+          while IO.select([@read_io], nil, nil, 0.25)
+            data = @read_io.readpartial(1024)
+            @phantomjs_logger.write(data)
+          end
         end
       }
 
@@ -57,32 +60,17 @@ module Capybara::Poltergeist
 
       redirect_stdout do
         @pid = Process.spawn(*command.map(&:to_s), process_options)
-        ObjectSpace.define_finalizer(self, self.class.process_killer(@pid) )
+        ObjectSpace.define_finalizer(self, self.class.process_killer(@pid))
       end
     end
 
     def stop
       if pid
-        begin
-          if Capybara::Poltergeist.windows?
-            Process.kill('KILL', pid)
-          else
-            Process.kill('TERM', pid)
-            begin
-              Timeout.timeout(KILL_TIMEOUT) { Process.wait(pid) }
-            rescue Timeout::Error
-              Process.kill('KILL', pid)
-              Process.wait(pid)
-            end
-          end
-        rescue Errno::ESRCH, Errno::ECHILD
-          # Zed's dead, baby
-        end
+        kill_phantomjs
         @out_thread.kill
         @write_io.close
         @read_io.close
         ObjectSpace.undefine_finalizer(self)
-        @pid = nil
       end
     end
 
@@ -103,7 +91,10 @@ module Capybara::Poltergeist
     private
 
     # This abomination is because JRuby doesn't support the :out option of
-    # Process.spawn
+    # Process.spawn. To be honest it works pretty bad with pipes either, because
+    # we ought close writing end in parent process immediately but JRuby will
+    # lose all the output from child. Process.popen can be used here and seems
+    # it works with JRuby but I've experienced strange mistakes on Rubinius.
     def redirect_stdout
       prev = STDOUT.dup
       prev.autoclose = false
@@ -113,6 +104,25 @@ module Capybara::Poltergeist
     ensure
       STDOUT.reopen(prev)
       $stdout = STDOUT
+    end
+
+    def kill_phantomjs
+      begin
+        if Capybara::Poltergeist.windows?
+          Process.kill('KILL', pid)
+        else
+          Process.kill('TERM', pid)
+          begin
+            Timeout.timeout(KILL_TIMEOUT) { Process.wait(pid) }
+          rescue Timeout::Error
+            Process.kill('KILL', pid)
+            Process.wait(pid)
+          end
+        end
+      rescue Errno::ESRCH, Errno::ECHILD
+        # Zed's dead, baby
+      end
+      @pid = nil
     end
   end
 end

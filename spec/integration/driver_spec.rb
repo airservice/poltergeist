@@ -44,22 +44,29 @@ module Capybara::Poltergeist
     end
 
     it 'supports capturing console.log' do
-      output = StringIO.new
-      Capybara.register_driver :poltergeist_with_logger do |app|
-        Capybara::Poltergeist::Driver.new(app, :phantomjs_logger => output)
-      end
+      begin
+        output = StringIO.new
+        Capybara.register_driver :poltergeist_with_logger do |app|
+          Capybara::Poltergeist::Driver.new(app, :phantomjs_logger => output)
+        end
 
-      session = Capybara::Session.new(:poltergeist_with_logger, TestApp)
-      session.visit('/poltergeist/console_log')
-      expect(output.string).to include('Hello world')
+        session = Capybara::Session.new(:poltergeist_with_logger, TestApp)
+        session.visit('/poltergeist/console_log')
+        expect(output.string).to include('Hello world')
+      ensure
+        session.driver.quit
+      end
     end
 
-    # FIXME: It definitely must be fixed on jruby, because all futher tests fail
     it 'raises an error and restarts the client if the client dies while executing a command' do
-      pending 'Temporarily disabled for jruby' if RUBY_PLATFORM == 'java'
       expect { @driver.browser.command('exit') }.to raise_error(DeadClient)
       @session.visit('/')
       expect(@driver.html).to include('Hello world')
+    end
+
+    it 'quits silently before visit call' do
+      driver = Capybara::Poltergeist::Driver.new(nil)
+      expect { driver.quit }.not_to raise_error
     end
 
     it 'has a viewport size of 1024x768 by default' do
@@ -352,15 +359,19 @@ module Capybara::Poltergeist
       end
 
       it 'supports extending the phantomjs world' do
-        @extended_driver.visit session_url("/poltergeist/requiring_custom_extension")
-        expect(@extended_driver.body).
-          to include(%Q%Location: <span id="location">1,-1</span>%)
-        expect(
-          @extended_driver.evaluate_script("document.getElementById('location').innerHTML")
-        ).to eq('1,-1')
-        expect(
-          @extended_driver.evaluate_script('navigator.geolocation')
-        ).to_not eq(nil)
+        begin
+          @extended_driver.visit session_url("/poltergeist/requiring_custom_extension")
+          expect(@extended_driver.body).
+            to include(%Q%Location: <span id="location">1,-1</span>%)
+          expect(
+            @extended_driver.evaluate_script("document.getElementById('location').innerHTML")
+          ).to eq('1,-1')
+          expect(
+            @extended_driver.evaluate_script('navigator.geolocation')
+          ).to_not eq(nil)
+        ensure
+          @extended_driver.quit
+        end
       end
     end
 
@@ -476,6 +487,15 @@ module Capybara::Poltergeist
 
         @session.visit('/poltergeist/with_js')
         expect(@driver.network_traffic.length).to eq(4)
+      end
+
+      it "gets cleared when being cleared" do
+        @session.visit('/poltergeist/with_js')
+        expect(@driver.network_traffic.length).to eq(4)
+
+        @driver.clear_network_traffic
+
+        expect(@driver.network_traffic.length).to eq(0)
       end
     end
 
@@ -606,6 +626,136 @@ module Capybara::Poltergeist
 
       expect(@driver.browser.window_handles).to eq(["popup"])
       expect(@driver.window_handles).to eq(["popup"])
+    end
+
+    context 'basic http authentication' do
+      it 'denies without credentials' do
+        @session.visit '/poltergeist/basic_auth'
+
+        expect(@session.status_code).to eq(401)
+        expect(@session).not_to have_content('Welcome, authenticated client')
+      end
+
+      it 'allows with given credentials' do
+        @driver.basic_authorize('login', 'pass')
+
+        @session.visit '/poltergeist/basic_auth'
+
+        expect(@session.status_code).to eq(200)
+        expect(@session).to have_content('Welcome, authenticated client')
+      end
+
+      it 'allows even overwriting headers' do
+        @driver.basic_authorize('login', 'pass')
+        @driver.headers = [{ 'Poltergeist' => 'true' }]
+
+        @session.visit '/poltergeist/basic_auth'
+
+        expect(@session.status_code).to eq(200)
+        expect(@session).to have_content('Welcome, authenticated client')
+      end
+
+      it 'denies with wrong credentials' do
+        @driver.basic_authorize('user', 'pass!')
+
+        @session.visit '/poltergeist/basic_auth'
+
+        expect(@session.status_code).to eq(401)
+        expect(@session).not_to have_content('Welcome, authenticated client')
+      end
+
+      it 'allows on POST request' do
+        @driver.basic_authorize('login', 'pass')
+
+        @session.visit '/poltergeist/basic_auth'
+        @session.click_button('Submit')
+
+        expect(@session.status_code).to eq(200)
+        expect(@session).to have_content('Authorized POST request')
+      end
+    end
+
+    context 'has ability to send keys' do
+      before { @session.visit('/poltergeist/send_keys') }
+
+      it 'sends keys to empty input' do
+        input = @session.find(:css, '#empty_input')
+
+        input.native.send_keys('Input')
+
+        expect(input.value).to eq('Input')
+      end
+
+      it 'sends keys to filled input' do
+        input = @session.find(:css, '#filled_input')
+
+        input.native.send_keys(' appended')
+
+        expect(input.value).to eq('Text appended')
+      end
+
+      it 'sends keys to empty textarea' do
+        input = @session.find(:css, '#empty_textarea')
+
+        input.native.send_keys('Input')
+
+        expect(input.value).to eq('Input')
+      end
+
+      it 'sends keys to filled textarea' do
+        input = @session.find(:css, '#filled_textarea')
+
+        input.native.send_keys(' appended')
+
+        expect(input.value).to eq('Description appended')
+      end
+
+      it 'sends keys to empty contenteditable div' do
+        input = @session.find(:css, '#empty_div')
+
+        input.native.send_keys('Input')
+
+        expect(input.text).to eq('Input')
+      end
+
+      it 'sends keys to filled contenteditable div' do
+        input = @session.find(:css, '#filled_div')
+
+        input.native.send_keys(' appended')
+
+        expect(input.text).to eq('Content appended')
+      end
+
+      it 'sends sequences' do
+        input = @session.find(:css, '#empty_input')
+
+        input.native.send_keys(:Shift, 'S', :Alt, 't', 'r', 'i', 'g', :Left, 'n')
+
+        expect(input.value).to eq('String')
+      end
+
+      it 'submits the form with sequence' do
+        input = @session.find(:css, '#without_submit_button input')
+
+        input.native.send_keys(:Enter)
+
+        expect(input.value).to eq('Submitted')
+      end
+
+      it 'raises error on modifier' do
+        input = @session.find(:css, '#empty_input')
+
+        expect { input.native.send_keys([:Shift, 's'], 'tring') }
+          .to raise_error(Capybara::Poltergeist::Error)
+      end
+
+      it 'has an alias' do
+        input = @session.find(:css, '#empty_input')
+
+        input.native.send_key('S')
+
+        expect(input.value).to eq('S')
+      end
     end
   end
 end

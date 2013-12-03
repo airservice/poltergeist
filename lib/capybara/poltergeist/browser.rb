@@ -108,7 +108,7 @@ module Capybara::Poltergeist
 
     def within_frame(handle, &block)
       if handle.is_a?(Capybara::Node::Base)
-        command 'push_frame', handle['id']
+        command 'push_frame', handle[:name] || handle[:id]
       else
         command 'push_frame', handle
       end
@@ -189,6 +189,10 @@ module Capybara::Poltergeist
       command 'resize', width, height
     end
 
+    def send_keys(page_id, id, keys)
+      command 'send_keys', page_id, id, normalize_keys(keys)
+    end
+
     def network_traffic
       command('network_traffic').values.map do |event|
         NetworkTraffic::Request.new(
@@ -196,6 +200,10 @@ module Capybara::Poltergeist
           event['responseParts'].map { |response| NetworkTraffic::Response.new(response) }
         )
       end
+    end
+
+    def clear_network_traffic
+      command('clear_network_traffic')
     end
 
     def equals(page_id, id, other_id)
@@ -242,6 +250,10 @@ module Capybara::Poltergeist
       command 'cookies_enabled', !!flag
     end
 
+    def set_http_auth(user, password)
+      command 'set_http_auth', user, password
+    end
+
     def js_errors=(val)
       command 'set_js_errors', !!val
     end
@@ -285,6 +297,21 @@ module Capybara::Poltergeist
       if !!options[:full] && options.has_key?(:selector)
         warn "Ignoring :selector in #render since :full => true was given at #{caller.first}"
         options.delete(:selector)
+      end
+    end
+
+    def normalize_keys(keys)
+      keys.map do |key|
+        case key
+        when Array
+          # String itself with modifiers like :alt, :shift, etc
+          raise Error, 'PhantomJS behaviour for key modifiers is currently ' \
+                       'broken, we will add this in later versions'
+        when Symbol
+          { key: key } # Return a known sequence for PhantomJS
+        when String
+          key # Plain string, nothing to do
+        end
       end
     end
   end

@@ -26,15 +26,13 @@ module Capybara::Poltergeist
       @server  = start_server(port)
     end
 
-    def port
-      server.addr[1]
-    end
-
     def start_server(port)
       time = Time.now
 
       begin
-        TCPServer.open(HOST, port || 0)
+        TCPServer.open(HOST, port || 0).tap do |server|
+          @port = server.addr[1]
+        end
       rescue Errno::EADDRINUSE
         if (Time.now - time) < BIND_TIMEOUT
           sleep(0.01)
@@ -89,11 +87,10 @@ module Capybara::Poltergeist
       raise TimeoutError.new(message)
     end
 
+    # Closing sockets separately as `close_read`, `close_write`
+    # causes IO mistakes on JRuby, using just `close` fixes that.
     def close
-      [server, socket].compact.each do |s|
-        s.close_read
-        s.close_write
-      end
+      [server, socket].compact.each(&:close)
     end
   end
 end

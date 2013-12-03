@@ -93,8 +93,15 @@ class Poltergeist.WebPage
         @_statusCode      = response.status
         @_responseHeaders = response.headers
 
+  setHttpAuth: (user, password) ->
+    @native.settings.userName = user
+    @native.settings.password = password
+
   networkTraffic: ->
     @_networkTraffic
+
+  clearNetworkTraffic: ->
+    @_networkTraffic = {}
 
   content: ->
     @native.frameContent
@@ -265,7 +272,8 @@ class Poltergeist.WebPage
         when 'PoltergeistAgent.ObsoleteNode'
           throw new Poltergeist.ObsoleteNode
         when 'PoltergeistAgent.InvalidSelector'
-          throw new Poltergeist.InvalidSelector(args[1])
+          [method, selector] = args
+          throw new Poltergeist.InvalidSelector(method, selector)
         else
           throw new Poltergeist.BrowserError(result.error.message, result.error.stack)
     else

@@ -254,6 +254,15 @@ class Poltergeist.Browser
     @page.setScrollPosition(left: left, top: top)
     this.sendResponse(true)
 
+  send_keys: (page_id, id, keys) ->
+    # Programmatically generated focus doesn't work for `sendKeys`.
+    # That's why we need something more realistic like user behavior.
+    this.node(page_id, id).mouseEvent('click')
+    for sequence in keys
+      key = if sequence.key? then @page.native.event.key[sequence.key] else sequence
+      @page.sendEvent('keypress', key)
+    this.sendResponse(true)
+
   render_base64: (format, full, selector = null)->
     this.set_clip_rect(full, selector)
     encoded_image = @page.renderBase64(format)
@@ -292,6 +301,10 @@ class Poltergeist.Browser
   network_traffic: ->
     this.sendResponse(@page.networkTraffic())
 
+  clear_network_traffic: ->
+    @page.clearNetworkTraffic()
+    this.sendResponse(true)
+
   get_headers: ->
     this.sendResponse(@page.getCustomHeaders())
 
@@ -329,6 +342,10 @@ class Poltergeist.Browser
 
   cookies_enabled: (flag) ->
     phantom.cookiesEnabled = flag
+    this.sendResponse(true)
+
+  set_http_auth: (user, password) ->
+    @page.setHttpAuth(user, password)
     this.sendResponse(true)
 
   set_js_errors: (value) ->
